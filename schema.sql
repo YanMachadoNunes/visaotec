@@ -1,12 +1,13 @@
 -- Esquema do banco VisãoTec (SQLite)
--- TODO: revisar colunas e tipos conforme o projeto evoluir
 
 CREATE TABLE IF NOT EXISTS produtos (
-    id        INTEGER PRIMARY KEY,
-    categoria TEXT NOT NULL,      -- 'armacao' ou 'lente'
-    nome      TEXT NOT NULL,
-    preco     REAL NOT NULL
-    -- TODO: campos de armação (tipo de montagem) e de lente (índice, tipo, material)
+    id            INTEGER PRIMARY KEY,
+    categoria     TEXT NOT NULL,  -- 'armacao' ou 'lente'
+    nome          TEXT NOT NULL,
+    preco         REAL NOT NULL,
+    tipo_montagem TEXT,           -- só armação
+    material      TEXT,           -- só lente
+    indice        REAL            -- só lente
 );
 
 CREATE TABLE IF NOT EXISTS vendas (
