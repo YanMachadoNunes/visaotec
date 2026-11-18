@@ -8,7 +8,7 @@ from contextlib import closing, contextmanager
 import pandas as pd
 import streamlit as st
 
-from visaotec import db, lentes, previsao, receita, vendas
+from visaotec import db, graficos, lentes, previsao, receita, vendas
 
 st.set_page_config(page_title="VisãoTec", layout="wide")
 st.title("VisãoTec")
@@ -49,11 +49,6 @@ def campos_olho(rotulo: str, chave: str) -> receita.Olho:
     eixo = c3.number_input("Eixo", min_value=0, max_value=180, step=1, key=f"{chave}_eixo")
     add = c4.number_input("Adição", min_value=0.0, step=0.25, format="%.2f", key=f"{chave}_add")
     return receita.Olho(esf, cil, int(eixo), add)
-
-
-def maior_grau(*olhos: receita.Olho) -> float:
-    """Maior potência em módulo, olhando os dois meridianos (E e E + C) de cada olho."""
-    return max(max(abs(o.esferico), abs(o.esferico + o.cilindro)) for o in olhos)
 
 
 def mostrar_validacao(od: receita.Olho, oe: receita.Olho) -> None:
@@ -123,26 +118,23 @@ with aba_receita:
             mostrar_conferencia(oe)
 
 with aba_lente:
-    grau_maximo = maior_grau(od, oe)
-    tem_adicao = od.adicao > 0 or oe.adicao > 0
+    grau_maximo = lentes.maior_grau(od, oe)
     st.caption("Usa a receita preenchida na primeira aba.")
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Maior grau da receita", f"{grau_maximo:.2f}".replace(".", ",") + " D")
-    with c2:
-        with quando_pronto("escolher_indice"):
-            st.metric("Índice sugerido", f"{lentes.escolher_indice(grau_maximo):.2f}")
-    with c3:
-        with quando_pronto("contar_orcamentos"):
-            st.metric("Orçamentos possíveis", lentes.contar_orcamentos())
+    with c2, quando_pronto("escolher_indice"):
+        st.metric("Índice sugerido", f"{lentes.escolher_indice(od, oe):.2f}")
+    with c3, quando_pronto("contar_orcamentos"):
+        st.metric("Orçamentos possíveis", lentes.contar_orcamentos())
 
-    tipo_armacao = st.selectbox("Tipo de armação", lentes.TIPOS_ARMACAO)
+    tipo_armacao = st.selectbox("Tipo de armação", list(lentes.LENTES_POR_ARMACAO))
     opcoes = None
     with quando_pronto("opcoes_compativeis"):
-        opcoes = lentes.opcoes_compativeis(tipo_armacao, grau_maximo)
+        opcoes = lentes.opcoes_compativeis(od, oe, tipo_armacao)
         st.latex(r"\text{Opções} = L_{\text{armação}} \cap L_{\text{receita}}")
         if opcoes:
-            st.write("Lentes compatíveis: " + ", ".join(sorted(opcoes)))
+            st.write("Índices compatíveis: " + ", ".join(f"{i:.2f}" for i in sorted(opcoes)))
         else:
             st.warning("Nenhuma lente atende a esta armação e a esta receita.")
 
@@ -158,14 +150,13 @@ with aba_lente:
 
     if opcoes:
         st.markdown("**Três opções mais baratas**")
-        tipos = ["bifocal", "multifocal"] if tem_adicao else ["visão simples"]
         with quando_pronto("tres_mais_baratas"):
-            baratas = lentes.tres_mais_baratas(opcoes, tipos)
+            baratas = lentes.tres_mais_baratas(od, oe, tipo_armacao)
             st.dataframe(
                 pd.DataFrame(
-                    [(lente, tipo, tratamento, reais(preco))
-                     for lente, tipo, tratamento, preco in baratas],
-                    columns=["Lente", "Tipo", "Tratamento", "Preço"],
+                    [(f"{o['indice']:.2f}", o["tipo"], o["tratamento"], reais(o["preco"]))
+                     for o in baratas],
+                    columns=["Índice", "Tipo", "Tratamento", "Preço"],
                 ),
                 hide_index=True,
             )
@@ -182,13 +173,13 @@ with aba_vendas:
         categoria = "armacao" if nome_categoria == "Armações" else "lente"
         with quando_pronto("ranking_produtos"):
             ranking = vendas.ranking_produtos(df_vendas, categoria)
-            st.pyplot(vendas.grafico_ranking(ranking))
+            st.pyplot(graficos.grafico_ranking(ranking))
 
         mensal = None
         st.subheader("Faturamento por mês")
         with quando_pronto("faturamento_mensal"):
             mensal = vendas.faturamento_mensal(df_vendas)
-            st.pyplot(vendas.grafico_faturamento(mensal))
+            st.pyplot(graficos.grafico_faturamento(mensal))
             with st.expander("Ver tabela"):
                 st.dataframe(mensal, hide_index=True)
 
@@ -199,5 +190,5 @@ with aba_vendas:
             with quando_pronto("treinar e prever"):
                 modelo = previsao.treinar(mensal)
                 proximos = previsao.prever(modelo, len(mensal))
-                st.pyplot(previsao.grafico_previsao(mensal, proximos))
+                st.pyplot(graficos.grafico_previsao(mensal, proximos))
                 st.caption("Regressão linear: número do mês → itens vendidos.")

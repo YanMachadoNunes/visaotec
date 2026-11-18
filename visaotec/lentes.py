@@ -1,63 +1,146 @@
-"""Módulo 2: recomendação de lente.
-
-Conteúdos da disciplina: funções (índice por faixa), conjuntos (compatibilidade)
-e princípio fundamental da contagem (orçamentos).
 """
+visaotec/lentes.py
+Catálogo fictício de lentes, recomendação de índice e montagem de orçamentos.
+
+Conteúdos da disciplina aplicados aqui:
+- NOÇÃO DE CONJUNTOS: lentes aceitas pela armação ∩ lentes possíveis para a receita
+- PRINCÍPIO FUNDAMENTAL DA CONTAGEM: nº de orçamentos = índices × tipos × tratamentos
+- FUNÇÕES: escolha do índice por faixa de grau e cálculo de preço
+"""
+
 from itertools import product
 
-INDICES = [1.50, 1.56, 1.61, 1.67]
-TIPOS = ["visão simples", "bifocal", "multifocal"]
-TRATAMENTOS = ["sem tratamento", "antirreflexo", "filtro de luz azul", "fotossensível"]
-TIPOS_ARMACAO = ["aro fechado", "fio de nylon", "parafusada"]
+from visaotec.receita import Olho
 
-# TODO: preços fictícios de cada opção (por índice, tipo e tratamento)
-PRECOS: dict = {}
+# ---------------------------------------------------------------------------
+# Catálogo fictício (preços em R$, par de lentes)
+# Preço final = preço do índice + adicional do tipo + adicional do tratamento
+# ---------------------------------------------------------------------------
+PRECO_INDICE = {
+    1.50: 120.0,   # resina comum (CR-39)
+    1.59: 220.0,   # policarbonato
+    1.67: 380.0,   # alto índice
+    1.74: 650.0,   # altíssimo índice
+}
+
+ADICIONAL_TIPO = {
+    "visão simples": 0.0,
+    "bifocal": 150.0,
+    "multifocal": 450.0,
+}
+
+ADICIONAL_TRATAMENTO = {
+    "sem tratamento": 0.0,
+    "antirreflexo": 120.0,
+    "filtro de luz azul": 180.0,
+    "fotossensível": 300.0,
+}
+
+INDICES = set(PRECO_INDICE)
+TIPOS = set(ADICIONAL_TIPO)
+TRATAMENTOS = set(ADICIONAL_TRATAMENTO)
+
+# Quais índices cada tipo de armação aceita
+LENTES_POR_ARMACAO = {
+    "aro fechado": {1.50, 1.59, 1.67, 1.74},   # aceita qualquer lente
+    "fio de nylon": {1.50, 1.59, 1.67, 1.74},  # meio aro: lente com canaleta
+    "parafusada": {1.59, 1.67},                # sem aro: o furo trinca lentes frágeis
+}
+
+# Faixas de grau para escolher o índice (valor absoluto do maior grau, em dioptrias).
+# Simplificação das faixas usuais do mercado: quanto maior o grau, maior o índice,
+# para a lente ficar mais fina.
+FAIXAS_INDICE = [
+    (2.00, 1.50),
+    (4.00, 1.59),
+    (6.00, 1.67),
+    (float("inf"), 1.74),
+]
 
 
-def escolher_indice(maior_grau: float) -> float:
-    """Sugere o índice de refração pela faixa do maior grau (em módulo).
+# ---------------------------------------------------------------------------
+# Recomendação de índice
+# ---------------------------------------------------------------------------
+def maior_grau(od: Olho, oe: Olho) -> float:
+    """Maior grau absoluto entre os meridianos dos dois olhos.
 
-    Função definida por partes: cada faixa de grau leva a um índice.
+    Cada olho tem dois meridianos: o esférico (E) e o esférico + cilindro (E + C).
+    A espessura da lente depende do meridiano mais forte.
     """
-    # TODO: definir as faixas (pesquisar o que as óticas usam)
-    raise NotImplementedError
+    meridianos = [od.esferico, od.esferico + od.cilindro,
+                  oe.esferico, oe.esferico + oe.cilindro]
+    return max(abs(m) for m in meridianos)
 
 
-def lentes_da_armacao(tipo_armacao: str) -> set[str]:
-    """Conjunto de lentes/materiais que uma armação aceita.
+def escolher_indice(od: Olho, oe: Olho) -> float:
+    """Recomenda o índice de refração pela faixa do maior grau."""
+    grau = maior_grau(od, oe)
+    for limite, indice in FAIXAS_INDICE:
+        if grau <= limite:
+            return indice
+    return 1.74  # nunca chega aqui por causa do inf, mas deixa explícito
 
-    Ex.: parafusada (sem aro) só aceita policarbonato ou trivex.
+
+# ---------------------------------------------------------------------------
+# Conjuntos de lentes compatíveis
+# ---------------------------------------------------------------------------
+def lentes_da_armacao(armacao: str) -> set[float]:
+    """Conjunto de índices que a armação aceita."""
+    if armacao not in LENTES_POR_ARMACAO:
+        raise ValueError(f"Armação desconhecida: {armacao}")
+    return set(LENTES_POR_ARMACAO[armacao])
+
+
+def lentes_da_receita(od: Olho, oe: Olho) -> set[float]:
+    """Conjunto de índices adequados à receita.
+
+    Vale o índice recomendado e todos os maiores que ele
+    (um índice maior também serve, só fica mais fino e mais caro).
     """
-    # TODO
-    raise NotImplementedError
+    minimo = escolher_indice(od, oe)
+    return {indice for indice in INDICES if indice >= minimo}
 
 
-def lentes_da_receita(maior_grau: float) -> set[str]:
-    """Conjunto de lentes/materiais que a receita permite."""
-    # TODO
-    raise NotImplementedError
+def opcoes_compativeis(od: Olho, oe: Olho, armacao: str) -> set[float]:
+    """Índices válidos para o cliente: interseção dos dois conjuntos."""
+    return lentes_da_armacao(armacao) & lentes_da_receita(od, oe)
 
 
-def opcoes_compativeis(tipo_armacao: str, maior_grau: float) -> set[str]:
-    """Opções = L_armação ∩ L_receita"""
-    # TODO
-    raise NotImplementedError
+def tipos_da_receita(od: Olho, oe: Olho) -> set[str]:
+    """Sem adição só faz sentido visão simples; com adição, os três tipos."""
+    if od.adicao == 0 and oe.adicao == 0:
+        return {"visão simples"}
+    return set(TIPOS)
 
 
-def contar_orcamentos() -> int:
-    """Número de orçamentos possíveis pelo princípio fundamental da contagem."""
-    # TODO: calcular pela regra do produto (não escrever o número na mão)
-    raise NotImplementedError
+# ---------------------------------------------------------------------------
+# Orçamentos (princípio fundamental da contagem)
+# ---------------------------------------------------------------------------
+def contar_orcamentos(indices=INDICES, tipos=TIPOS, tratamentos=TRATAMENTOS) -> int:
+    """Regra do produto: cada escolha é independente, então multiplica.
 
-
-def tres_mais_baratas(opcoes: set[str], tipos: list[str]) -> list[tuple]:
-    """Monta as três combinações mais baratas entre as lentes compatíveis.
-
-    `opcoes` vem de opcoes_compativeis e `tipos` são os tipos de lente que a
-    receita permite (o app passa só bifocal e multifocal quando há adição).
-    Cada item devolvido é (lente, tipo, tratamento, preço).
-
-    Dica: itertools.product gera todas as combinações.
+    Com o catálogo completo: 4 índices × 3 tipos × 4 tratamentos = 48.
     """
-    # TODO
-    raise NotImplementedError
+    return len(indices) * len(tipos) * len(tratamentos)
+
+
+def preco(indice: float, tipo: str, tratamento: str) -> float:
+    """Preço do par de lentes para uma combinação."""
+    return PRECO_INDICE[indice] + ADICIONAL_TIPO[tipo] + ADICIONAL_TRATAMENTO[tratamento]
+
+
+def gerar_orcamentos(indices=INDICES, tipos=TIPOS, tratamentos=TRATAMENTOS) -> list[dict]:
+    """Lista todas as combinações (produto cartesiano) com o preço de cada uma."""
+    return [
+        {"indice": i, "tipo": t, "tratamento": tr, "preco": preco(i, t, tr)}
+        for i, t, tr in product(sorted(indices), sorted(tipos), sorted(tratamentos))
+    ]
+
+
+def tres_mais_baratas(od: Olho, oe: Olho, armacao: str) -> list[dict]:
+    """As 3 opções mais baratas que servem para a receita e a armação."""
+    orcamentos = gerar_orcamentos(
+        indices=opcoes_compativeis(od, oe, armacao),
+        tipos=tipos_da_receita(od, oe),
+    )
+    return sorted(orcamentos, key=lambda o: o["preco"])[:3]

@@ -15,7 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from visaotec import db  # noqa: E402
+from visaotec import db
+from visaotec.lentes import PRECO_INDICE
 
 SEMENTE = 42  # para os dados saírem iguais toda vez
 PRIMEIRO_MES = (2025, 11)
@@ -34,13 +35,12 @@ ARMACOES = [
 ]
 
 # (nome, material, índice, preço, peso nas vendas)
+# Os índices e preços são os mesmos de visaotec/lentes.py.
 LENTES = [
-    ("Resina 1.50", "resina", 1.50, 120.00, 10),
-    ("Resina 1.56", "resina", 1.56, 180.00, 8),
-    ("Resina 1.61", "resina", 1.61, 290.00, 5),
-    ("Resina 1.67", "resina", 1.67, 420.00, 2),
-    ("Trivex 1.53", "trivex", 1.53, 340.00, 2),
-    ("Policarbonato 1.59", "policarbonato", 1.59, 260.00, 4),
+    ("Resina 1.50", "resina", 1.50, PRECO_INDICE[1.50], 10),
+    ("Policarbonato 1.59", "policarbonato", 1.59, PRECO_INDICE[1.59], 7),
+    ("Alto índice 1.67", "alto índice", 1.67, PRECO_INDICE[1.67], 4),
+    ("Altíssimo índice 1.74", "altíssimo índice", 1.74, PRECO_INDICE[1.74], 1),
 ]
 
 # Dezembro (presentes) e janeiro/fevereiro (volta às aulas) vendem mais.

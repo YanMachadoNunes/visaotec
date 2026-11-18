@@ -1,8 +1,12 @@
 """tests/test_receita.py — rode com: pytest"""
 
 from visaotec.receita import (
-    Olho, transpor_cilindro, para_cilindro_negativo,
-    grau_perto, equivalente_esferico, validar,
+    Olho,
+    equivalente_esferico,
+    grau_perto,
+    para_cilindro_negativo,
+    transpor_cilindro,
+    validar,
 )
 
 
