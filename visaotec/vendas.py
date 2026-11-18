@@ -48,7 +48,7 @@ def grafico_faturamento(mensal: pd.DataFrame) -> Figure:
     posicoes = range(len(mensal))
     eixos.plot(posicoes, mensal["faturamento"], color=AZUL, linewidth=2, marker="o", markersize=5)
     eixos.set_xticks(list(posicoes), [rotulo_mes(m) for m in mensal["mes"]])
-    eixos.set_ylim(bottom=0)
+    eixos.set_ylim(bottom=0, top=mensal["faturamento"].max() * 1.1)
     eixos.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"R$ {v / 1000:.0f} mil"))
     eixos.grid(axis="y", color=GRADE, linewidth=1)
     return figura
