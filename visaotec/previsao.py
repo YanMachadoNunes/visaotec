@@ -30,7 +30,7 @@ def prever(modelo, meses_historico: int, meses_a_frente: int = 3) -> pd.DataFram
 
 def grafico_previsao(mensal: pd.DataFrame, previsao: pd.DataFrame) -> Figure:
     """Curva histórica + curva prevista no mesmo gráfico."""
-    figura, eixos = nova_figura()
+    figura, eixos = nova_figura(largura=10)  # mais larga: são 15 meses no eixo
     total = len(mensal)
     x_real = list(range(1, total + 1))
     y_real = mensal["quantidade"].tolist()
