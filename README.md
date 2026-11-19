@@ -32,10 +32,17 @@ pytest
 | --- | --- | --- |
 | `visaotec/receita.py` | Transposição, grau de perto, equivalente esférico, validação | Funções |
 | `visaotec/lentes.py` | Índice por faixa, compatibilidade, contagem de orçamentos | Funções, conjuntos, contagem |
-| `visaotec/vendas.py` | Ranking e faturamento mensal | Pandas, matplotlib |
-| `visaotec/previsao.py` | Regressão linear da demanda | Machine learning |
+| `visaotec/vendas.py` | Leitura das vendas, ranking e faturamento mensal, total ou por categoria | Pandas |
+| `visaotec/previsao.py` | Regressão linear da demanda, com R², erro médio e teste nos últimos meses | Machine learning |
+| `visaotec/graficos.py` | Gráficos de ranking, faturamento e previsão | matplotlib |
+| `visaotec/estilo.py` | Cores e formatação comuns aos gráficos | matplotlib |
 | `visaotec/db.py` + `schema.sql` | Banco SQLite | Banco de dados |
-| `scripts/gerar_dados.py` | Gera catálogo, 12 meses de vendas e receitas fictícias | Pandas |
+| `scripts/gerar_dados.py` | Gera catálogo, 12 meses de vendas e receitas fictícias | Banco de dados |
 | `app.py` | Interface Streamlit com as três abas | |
+| `tests/` | Testes de receita, lentes, vendas e previsão | |
+
+## Previsão de demanda
+
+O painel ajusta uma reta `y = ax + b`, em que `x` é o número do mês (0 no primeiro mês) e `y` é o total de itens ou o faturamento. A previsão pode usar todas as vendas ou só armações ou lentes. A reta capta a tendência, mas não a sazonalidade.
 
 Todos os dados são fictícios.

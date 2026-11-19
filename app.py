@@ -187,16 +187,22 @@ with aba_vendas:
         if mensal is None:
             st.info("A previsão usa o resultado de `faturamento_mensal`.")
         else:
-            alvo = st.radio("Prever", ["Itens vendidos", "Faturamento"], horizontal=True)
+            filtro_categoria, filtro_alvo = st.columns(2)
+            categorias_previsao = {"Todas": None, "Armações": "armacao", "Lentes": "lente"}
+            nome_previsao = filtro_categoria.radio(
+                "Categoria da previsão", list(categorias_previsao), horizontal=True
+            )
+            alvo = filtro_alvo.radio("Prever", ["Itens vendidos", "Faturamento"], horizontal=True)
             coluna = "itens" if alvo == "Itens vendidos" else "faturamento"
             formatar = (lambda v: f"{v:.1f} itens".replace(".", ",")) if coluna == "itens" else reais
+            mensal_previsao = vendas.faturamento_mensal(df_vendas, categorias_previsao[nome_previsao])
 
             with quando_pronto("treinar, prever e avaliar"):
-                treino = previsao.treinar(mensal, coluna)
+                treino = previsao.treinar(mensal_previsao, coluna)
                 proximos = previsao.prever(treino)
-                teste = previsao.avaliar(mensal, coluna)
+                teste = previsao.avaliar(mensal_previsao, coluna)
 
-                st.pyplot(graficos.grafico_previsao(mensal, proximos, coluna))
+                st.pyplot(graficos.grafico_previsao(mensal_previsao, proximos, coluna))
                 st.latex(rf"y = {treino['a']:.2f}\,x + {treino['b']:.2f}".replace(".", "{,}"))
                 st.caption("Regressão linear: x é o número do mês, começando em 0 no primeiro mês.")
 
