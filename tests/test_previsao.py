@@ -35,3 +35,4 @@ def test_avaliar_sem_erro_em_dados_lineares():
 def test_poucos_meses():
     with pytest.raises(ValueError):
         treinar(mensal_em_reta().head(2))
+        

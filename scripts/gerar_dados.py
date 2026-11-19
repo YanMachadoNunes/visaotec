@@ -20,6 +20,7 @@ from visaotec.lentes import PRECO_INDICE
 
 SEMENTE = 42  # para os dados saírem iguais toda vez
 PRIMEIRO_MES = (2025, 11)
+PROPORCAO_SO_LENTE = 0.20  # atendimentos em que o cliente só troca a lente
 
 # (nome, tipo de montagem, preço, peso nas vendas)
 ARMACOES = [
@@ -62,14 +63,17 @@ def gerar_catalogo() -> list[dict]:
 
 
 def gerar_vendas(catalogo: list[dict], meses: int = 12) -> list[tuple]:
-    """Cada atendimento vende uma armação e uma lente.
+    """Cada atendimento vende uma armação e uma lente, ou só a lente.
 
     O número de atendimentos cresce aos poucos (tendência), muda com a época do
     ano (sazonalidade) e tem um ruído, para a regressão ter o que aprender.
+    Parte dos clientes só troca a lente e mantém a armação, por isso as
+    categorias têm curvas de venda diferentes.
     """
     armacoes = [p for p in catalogo if p["categoria"] == "armacao"]
     lentes = [p for p in catalogo if p["categoria"] == "lente"]
     ano_inicial, mes_inicial = PRIMEIRO_MES
+    sorteio_troca = random.Random(SEMENTE + 1)
     vendas = []
     for i in range(meses):
         ano = ano_inicial + (mes_inicial - 1 + i) // 12
@@ -79,8 +83,11 @@ def gerar_vendas(catalogo: list[dict], meses: int = 12) -> list[tuple]:
         for _ in range(atendimentos):
             dia = date(ano, mes, random.randint(1, dias_no_mes)).isoformat()
             desconto = random.choice([1.0, 1.0, 1.0, 0.95, 0.90])
+            so_troca_lente = sorteio_troca.random() < PROPORCAO_SO_LENTE
             for grupo in (armacoes, lentes):
                 produto = random.choices(grupo, weights=[p["peso"] for p in grupo])[0]
+                if grupo is armacoes and so_troca_lente:
+                    continue
                 vendas.append((dia, produto["id"], 1, round(produto["preco"] * desconto, 2)))
     return vendas
 
