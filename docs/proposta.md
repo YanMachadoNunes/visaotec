@@ -6,7 +6,7 @@ Nov 11, 2026 · @Yan
 
 - **Disciplina:** Matemática Computacional Aplicada
 - **Professores:** Aron e Cristiano
-- **Integrantes:** Maycon da Silva Pereira RA 942622071, Yan Machado Nunes 172513312
+- **Integrantes:** Maycon da Silva Pereira, Yan Machado Nunes
 - **Tema:** próprio, sujeito à aprovação do professor
 
 ## Nome, problema e público

@@ -4,18 +4,24 @@ Cada bloco mostra o resultado assim que a função dele estiver pronta. Enquanto
 ela tiver só o `raise NotImplementedError`, aparece um aviso no lugar.
 """
 from contextlib import closing, contextmanager
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
-from visaotec import db, graficos, lentes, previsao, receita, vendas
+from visaotec import consultas, db, graficos, lentes, previsao, receita, vendas
+
+AVISO_ORCAMENTOS = (
+    "A tabela de orçamentos deste banco está no formato antigo. "
+    "Atualize o banco para salvar e listar orçamentos."
+)
 
 st.set_page_config(page_title="VisãoTec", layout="wide")
 st.title("VisãoTec")
 st.caption("Assistente técnico para óticas")
 
-aba_receita, aba_lente, aba_vendas = st.tabs(
-    ["Conferência de receita", "Recomendação de lente", "Painel de vendas"]
+aba_receita, aba_lente, aba_vendas, aba_historico = st.tabs(
+    ["Conferência de receita", "Recomendação de lente", "Painel de vendas", "Histórico"]
 )
 
 
@@ -101,6 +107,68 @@ def mostrar_conferencia(olho: receita.Olho) -> None:
         )
 
 
+def abrir_banco():
+    """Abre o banco garantindo que as tabelas existem."""
+    conn = db.conectar()
+    db.criar_tabelas(conn)
+    return conn
+
+
+def receita_salva_atual(od: receita.Olho, oe: receita.Olho) -> int | None:
+    """Id da receita salva nesta sessão, se ela for a que está preenchida agora."""
+    salva = st.session_state.get("receita_salva")
+    if salva and salva["od"] == od and salva["oe"] == oe:
+        return salva["id"]
+    return None
+
+
+def mostrar_salvar_receita(od: receita.Olho, oe: receita.Olho) -> None:
+    receita_id = receita_salva_atual(od, oe)
+    tem_erros = bool(receita.validar(od, oe)["erros"])
+    if receita_id is not None:
+        st.success(f"Receita salva no histórico com o nº {receita_id}.")
+    elif tem_erros:
+        st.caption("Corrija os erros para salvar esta receita.")
+    salvar = st.button("Salvar no histórico", disabled=tem_erros or receita_id is not None)
+    if salvar:
+        with closing(abrir_banco()) as conn:
+            novo_id = db.salvar_receita(conn, od, oe)
+        st.session_state["receita_salva"] = {"id": novo_id, "od": od, "oe": oe}
+        st.rerun()
+
+
+def mostrar_salvar_orcamento(od, oe, armacao: str, baratas: list[dict]) -> None:
+    with closing(abrir_banco()) as conn:
+        atualizada = consultas.orcamentos_atualizados(conn)
+    if not atualizada:
+        st.warning(AVISO_ORCAMENTOS)
+        return
+
+    escolhido = st.selectbox(
+        "Orçamento para salvar",
+        baratas,
+        format_func=lambda o: (
+            f"{o['indice']:.2f} · {o['tipo']} · {o['tratamento']} · {reais(o['preco'])}"
+        ),
+    )
+    receita_id = receita_salva_atual(od, oe)
+    if receita_id is None:
+        st.caption("Salve a receita na primeira aba para ligar o orçamento a ela.")
+    if st.button("Salvar orçamento"):
+        with closing(abrir_banco()) as conn:
+            novo_id = db.salvar_orcamento(conn, armacao, escolhido, receita_id)
+        st.success(f"Orçamento salvo no histórico com o nº {novo_id}.")
+
+
+def data_hora(texto: str) -> str:
+    return datetime.fromisoformat(texto).strftime("%d/%m/%Y %H:%M")
+
+
+def resumo_olho(olho: receita.Olho) -> str:
+    texto = f"{grau(olho.esferico)} {grau(olho.cilindro)} x {olho.eixo}°"
+    return f"{texto} · adição {grau(olho.adicao)}" if olho.adicao else texto
+
+
 with aba_receita:
     od = campos_olho("Olho direito (OD)", "od")
     oe = campos_olho("Olho esquerdo (OE)", "oe")
@@ -116,6 +184,7 @@ with aba_receita:
         with coluna_oe:
             st.subheader("Resultado OE")
             mostrar_conferencia(oe)
+        mostrar_salvar_receita(od, oe)
 
 with aba_lente:
     grau_maximo = lentes.maior_grau(od, oe)
@@ -138,9 +207,9 @@ with aba_lente:
         else:
             st.warning("Nenhuma lente atende a esta armação e a esta receita.")
 
-    if db.banco_pronto():
+    if consultas.banco_pronto():
         with closing(db.conectar()) as conn:
-            armacoes = db.armacoes_por_montagem(conn, tipo_armacao)
+            armacoes = consultas.armacoes_por_montagem(conn, tipo_armacao)
         st.markdown("**Armações deste tipo no catálogo**")
         st.dataframe(
             pd.DataFrame({"Armação": [a["nome"] for a in armacoes],
@@ -160,9 +229,11 @@ with aba_lente:
                 ),
                 hide_index=True,
             )
+            if baratas:
+                mostrar_salvar_orcamento(od, oe, tipo_armacao, baratas)
 
 with aba_vendas:
-    if not db.banco_pronto():
+    if not consultas.banco_pronto():
         st.info("Gere os dados com `python scripts/gerar_dados.py` e recarregue a página.")
     else:
         with closing(db.conectar()) as conn:
@@ -221,3 +292,43 @@ with aba_vendas:
                     }),
                     hide_index=True,
                 )
+
+with aba_historico:
+    with closing(abrir_banco()) as conn:
+        receitas_salvas = db.listar_receitas(conn)
+        atualizada = consultas.orcamentos_atualizados(conn)
+        orcamentos_salvos = consultas.listar_orcamentos(conn) if atualizada else []
+
+    st.subheader("Últimas receitas")
+    if receitas_salvas:
+        st.dataframe(
+            pd.DataFrame({
+                "Nº": [r["id"] for r in receitas_salvas],
+                "Data": [data_hora(r["criada_em"]) for r in receitas_salvas],
+                "OD": [resumo_olho(r["od"]) for r in receitas_salvas],
+                "OE": [resumo_olho(r["oe"]) for r in receitas_salvas],
+            }),
+            hide_index=True,
+        )
+    else:
+        st.info("Nenhuma receita salva ainda.")
+
+    st.subheader("Últimos orçamentos")
+    if not atualizada:
+        st.warning(AVISO_ORCAMENTOS)
+    elif orcamentos_salvos:
+        st.dataframe(
+            pd.DataFrame({
+                "Nº": [o["id"] for o in orcamentos_salvos],
+                "Data": [data_hora(o["criado_em"]) for o in orcamentos_salvos],
+                "Receita": [o["receita_id"] or "sem receita" for o in orcamentos_salvos],
+                "Armação": [o["armacao"] for o in orcamentos_salvos],
+                "Índice": [f"{o['indice']:.2f}" for o in orcamentos_salvos],
+                "Tipo": [o["tipo"] for o in orcamentos_salvos],
+                "Tratamento": [o["tratamento"] for o in orcamentos_salvos],
+                "Preço": [reais(o["preco"]) for o in orcamentos_salvos],
+            }).astype({"Receita": str}),
+            hide_index=True,
+        )
+    else:
+        st.info("Nenhum orçamento salvo ainda.")
