@@ -187,8 +187,31 @@ with aba_vendas:
         if mensal is None:
             st.info("A previsão usa o resultado de `faturamento_mensal`.")
         else:
-            with quando_pronto("treinar e prever"):
-                modelo = previsao.treinar(mensal)
-                proximos = previsao.prever(modelo, len(mensal))
-                st.pyplot(graficos.grafico_previsao(mensal, proximos))
-                st.caption("Regressão linear: número do mês → itens vendidos.")
+            alvo = st.radio("Prever", ["Itens vendidos", "Faturamento"], horizontal=True)
+            coluna = "itens" if alvo == "Itens vendidos" else "faturamento"
+            formatar = (lambda v: f"{v:.1f} itens".replace(".", ",")) if coluna == "itens" else reais
+
+            with quando_pronto("treinar, prever e avaliar"):
+                treino = previsao.treinar(mensal, coluna)
+                proximos = previsao.prever(treino)
+                teste = previsao.avaliar(mensal, coluna)
+
+                st.pyplot(graficos.grafico_previsao(mensal, proximos, coluna))
+                st.latex(rf"y = {treino['a']:.2f}\,x + {treino['b']:.2f}".replace(".", "{,}"))
+                st.caption("Regressão linear: x é o número do mês, começando em 0 no primeiro mês.")
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Crescimento por mês", formatar(treino["a"]))
+                c2.metric("R² da reta", f"{treino['r2']:.2f}".replace(".", ","))
+                c3.metric(
+                    "Erro nos 3 meses de teste",
+                    f"{teste['erro_percentual']:.1f}%".replace(".", ","),
+                    help="O modelo treina sem os 3 últimos meses e tenta acertá-los.",
+                )
+                st.dataframe(
+                    pd.DataFrame({
+                        "Mês": proximos["mes"],
+                        "Previsão": [formatar(v) for v in proximos["previsto"]],
+                    }),
+                    hide_index=True,
+                )
