@@ -1,4 +1,5 @@
 """Aparência comum dos gráficos do painel."""
+import matplotlib
 import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -9,6 +10,12 @@ TEXTO_SECUNDARIO = "#52514e"
 GRADE = "#e6e5e0"
 AZUL = "#2a78d6"     # dados reais
 LARANJA = "#eb6834"  # previsão
+
+# Fonte parecida com a do Streamlit (Source Sans); usa a primeira que existir na máquina.
+matplotlib.rcParams["font.family"] = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = [
+    "Source Sans 3", "Source Sans Pro", "Noto Sans", "Segoe UI", "Arial", "DejaVu Sans",
+]
 
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 

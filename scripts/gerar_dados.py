@@ -10,7 +10,7 @@ só entram se a tabela estiver vazia, para não apagar o histórico salvo no app
 import calendar
 import random
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -38,10 +38,10 @@ ARMACOES = [
 # (nome, material, índice, preço, peso nas vendas)
 # Os índices e preços são os mesmos de visaotec/lentes.py.
 LENTES = [
-    ("Resina 1.50", "resina", 1.50, PRECO_INDICE[1.50], 10),
-    ("Policarbonato 1.59", "policarbonato", 1.59, PRECO_INDICE[1.59], 7),
-    ("Alto índice 1.67", "alto índice", 1.67, PRECO_INDICE[1.67], 4),
-    ("Altíssimo índice 1.74", "altíssimo índice", 1.74, PRECO_INDICE[1.74], 1),
+    ("Resina 1,50", "resina", 1.50, PRECO_INDICE[1.50], 10),
+    ("Policarbonato 1,59", "policarbonato", 1.59, PRECO_INDICE[1.59], 7),
+    ("Alto índice 1,67", "alto índice", 1.67, PRECO_INDICE[1.67], 4),
+    ("Altíssimo índice 1,74", "altíssimo índice", 1.74, PRECO_INDICE[1.74], 1),
 ]
 
 # Dezembro (presentes) e janeiro/fevereiro (volta às aulas) vendem mais.
@@ -97,12 +97,24 @@ def _grau(minimo: float, maximo: float) -> float:
     return random.randint(round(minimo * 4), round(maximo * 4)) / 4
 
 
-def gerar_receitas(n: int = 50) -> list[tuple]:
-    agora = datetime(2026, 11, 1, 9, 0).isoformat(timespec="seconds")
-    receitas = []
+def _horarios(n: int) -> list[str]:
+    """n horários de atendimento espalhados nos 60 dias antes de 01/11/2026, em ordem."""
+    inicio = datetime(2026, 9, 2)
+    horarios = []
     for _ in range(n):
+        dia = inicio + timedelta(days=random.randint(0, 59))
+        if dia.weekday() == 6:  # domingo a ótica fecha
+            dia += timedelta(days=1)
+        hora = dia.replace(hour=random.randint(9, 17), minute=random.choice(range(0, 60, 5)))
+        horarios.append(hora.isoformat(timespec="seconds"))
+    return sorted(horarios)
+
+
+def gerar_receitas(n: int = 50) -> list[tuple]:
+    receitas = []
+    for criada_em in _horarios(n):
         adicao = _grau(0.75, 3.00) if random.random() < 0.3 else 0.0
-        linha = [agora]
+        linha = [criada_em]
         for _olho in range(2):
             cilindro = _grau(-2.50, 0.00)
             eixo = random.randint(1, 180) if cilindro else 0

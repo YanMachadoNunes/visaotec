@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from visaotec import consultas, db, graficos, lentes, previsao, receita, vendas
+from visaotec.estilo import rotulo_mes
 
 AVISO_ORCAMENTOS = (
     "A tabela de orçamentos deste banco está no formato antigo. "
@@ -17,6 +18,11 @@ AVISO_ORCAMENTOS = (
 )
 
 st.set_page_config(page_title="VisãoTec", layout="wide")
+# Largura máxima para não esticar em monitor grande, e menos espaço acima do título.
+st.markdown(
+    "<style>.block-container {max-width: 1160px; padding-top: 2.5rem;}</style>",
+    unsafe_allow_html=True,
+)
 st.title("VisãoTec")
 st.caption("Assistente técnico para óticas")
 
@@ -37,6 +43,11 @@ def quando_pronto(funcao: str):
 def grau(valor: float) -> str:
     """Formata um grau com sinal e vírgula, como numa receita."""
     return f"{valor + 0.0:+.2f}".replace(".", ",")
+
+
+def indice(valor: float) -> str:
+    """Índice de refração com vírgula, como o resto do app (1.59 -> 1,59)."""
+    return f"{valor:.2f}".replace(".", ",")
 
 
 def grau_latex(valor: float) -> str:
@@ -148,7 +159,7 @@ def mostrar_salvar_orcamento(od, oe, armacao: str, baratas: list[dict]) -> None:
         "Orçamento para salvar",
         baratas,
         format_func=lambda o: (
-            f"{o['indice']:.2f} · {o['tipo']} · {o['tratamento']} · {reais(o['preco'])}"
+            f"{indice(o['indice'])} · {o['tipo']} · {o['tratamento']} · {reais(o['preco'])}"
         ),
     )
     receita_id = receita_salva_atual(od, oe)
@@ -165,7 +176,9 @@ def data_hora(texto: str) -> str:
 
 
 def resumo_olho(olho: receita.Olho) -> str:
-    texto = f"{grau(olho.esferico)} {grau(olho.cilindro)} x {olho.eixo}°"
+    texto = grau(olho.esferico)
+    if olho.cilindro:  # sem cilindro não há eixo: mostra só o esférico
+        texto += f" {grau(olho.cilindro)} x {olho.eixo}°"
     return f"{texto} · adição {grau(olho.adicao)}" if olho.adicao else texto
 
 
@@ -193,17 +206,19 @@ with aba_lente:
     c1, c2, c3 = st.columns(3)
     c1.metric("Maior grau da receita", f"{grau_maximo:.2f}".replace(".", ",") + " D")
     with c2, quando_pronto("escolher_indice"):
-        st.metric("Índice sugerido", f"{lentes.escolher_indice(od, oe):.2f}")
+        st.metric("Índice sugerido", indice(lentes.escolher_indice(od, oe)))
     with c3, quando_pronto("contar_orcamentos"):
         st.metric("Orçamentos possíveis", lentes.contar_orcamentos())
 
-    tipo_armacao = st.selectbox("Tipo de armação", list(lentes.LENTES_POR_ARMACAO))
+    tipo_armacao = st.selectbox(
+        "Tipo de armação", list(lentes.LENTES_POR_ARMACAO), format_func=str.capitalize
+    )
     opcoes = None
     with quando_pronto("opcoes_compativeis"):
         opcoes = lentes.opcoes_compativeis(od, oe, tipo_armacao)
         st.latex(r"\text{Opções} = L_{\text{armação}} \cap L_{\text{receita}}")
         if opcoes:
-            st.write("Índices compatíveis: " + ", ".join(f"{i:.2f}" for i in sorted(opcoes)))
+            st.write("Índices compatíveis: " + " · ".join(indice(i) for i in sorted(opcoes)))
         else:
             st.warning("Nenhuma lente atende a esta armação e a esta receita.")
 
@@ -223,7 +238,7 @@ with aba_lente:
             baratas = lentes.tres_mais_baratas(od, oe, tipo_armacao)
             st.dataframe(
                 pd.DataFrame(
-                    [(f"{o['indice']:.2f}", o["tipo"], o["tratamento"], reais(o["preco"]))
+                    [(indice(o["indice"]), o["tipo"], o["tratamento"], reais(o["preco"]))
                      for o in baratas],
                     columns=["Índice", "Tipo", "Tratamento", "Preço"],
                 ),
@@ -287,7 +302,7 @@ with aba_vendas:
                 )
                 st.dataframe(
                     pd.DataFrame({
-                        "Mês": proximos["mes"],
+                        "Mês": [rotulo_mes(m) for m in proximos["mes"]],
                         "Previsão": [formatar(v) for v in proximos["previsto"]],
                     }),
                     hide_index=True,
@@ -322,8 +337,8 @@ with aba_historico:
                 "Nº": [o["id"] for o in orcamentos_salvos],
                 "Data": [data_hora(o["criado_em"]) for o in orcamentos_salvos],
                 "Receita": [o["receita_id"] or "sem receita" for o in orcamentos_salvos],
-                "Armação": [o["armacao"] for o in orcamentos_salvos],
-                "Índice": [f"{o['indice']:.2f}" for o in orcamentos_salvos],
+                "Armação": [o["armacao"].capitalize() for o in orcamentos_salvos],
+                "Índice": [indice(o["indice"]) for o in orcamentos_salvos],
                 "Tipo": [o["tipo"] for o in orcamentos_salvos],
                 "Tratamento": [o["tratamento"] for o in orcamentos_salvos],
                 "Preço": [reais(o["preco"]) for o in orcamentos_salvos],
